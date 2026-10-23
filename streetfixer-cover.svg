@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <pattern id="haz" width="80" height="80" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="40" height="80" fill="#F2C230"/><rect x="40" width="40" height="80" fill="#1B1E1B"/>
+    </pattern>
+    <radialGradient id="hole" cx="50%" cy="45%" r="60%">
+      <stop offset="0" stop-color="#050605"/><stop offset="1" stop-color="#2A2E29"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="#1B1E1B"/>
+  <!-- asphalt speckle -->
+  <g fill="#262A25">
+    <circle cx="120" cy="300" r="5"/><circle cx="880" cy="260" r="4"/><circle cx="210" cy="720" r="6"/>
+    <circle cx="840" cy="700" r="5"/><circle cx="300" cy="180" r="3"/><circle cx="760" cy="160" r="4"/>
+  </g>
+  <rect x="0" y="0" width="1024" height="56" fill="url(#haz)"/>
+  <rect x="0" y="968" width="1024" height="56" fill="url(#haz)"/>
+  <!-- map pin -->
+  <path d="M512 150 C400 150 318 232 318 340 C318 470 512 640 512 640 C512 640 706 470 706 340 C706 232 624 150 512 150 Z" fill="#F2C230"/>
+  <!-- pothole inside pin -->
+  <ellipse cx="512" cy="335" rx="118" ry="82" fill="url(#hole)"/>
+  <path d="M398 330 L360 318 M626 342 L668 330 M470 258 L455 228 M560 410 L578 440" stroke="#1B1E1B" stroke-width="10" stroke-linecap="round"/>
+  <!-- tick -->
+  <path d="M462 338 L500 374 L566 300" fill="none" stroke="#F2C230" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="512" y="800" text-anchor="middle" font-family="Nimbus Sans Narrow" font-weight="bold" font-size="150" fill="#F3F0E6" letter-spacing="4">STREET FIXER</text>
+  <text x="512" y="880" text-anchor="middle" font-family="Nimbus Sans" font-size="44" fill="#C9C6BA">Snap it. We file it, chase it, fix it.</text>
+</svg>

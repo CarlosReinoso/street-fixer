@@ -1,0 +1,366 @@
+<!doctype html>
+<!--
+  Street Fixer: mobile reporting page (reached by QR sticker or short link).
+  Flow: take photo -> confirm location on map -> send -> live progress -> reply card.
+  No install, no sign-up. Talks to POST /api/report.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B1E1B">
+<title>Street Fixer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="bar">
+  <div class="logo">STREET <span>FIXER</span></div>
+  <div class="tag">Snap it. We file it, chase it, fix it.</div>
+</header>
+
+<div id="test-banner" class="test-banner" hidden>🧪 TEST MODE: reports are saved but never sent to a council</div>
+<main>
+  <!-- Step 1: photo -->
+  <section id="step-photo" class="card">
+    <h1>Report a street problem</h1>
+    <p class="muted">Pothole, fly-tipping or a broken streetlight. One photo is enough.</p>
+    <label class="big-btn" for="photo">📸 Take a photo</label>
+    <input id="photo" type="file" accept="image/*" capture="environment" hidden>
+    <p class="hint">Measuring a pothole? Put a coin, your shoe or your finger next to it, only when it's safe.</p>
+  </section>
+
+  <!-- Step 2: location + send -->
+  <section id="step-locate" class="card" hidden>
+    <img id="preview" class="preview" alt="Your photo">
+    <h2>Where is it?</h2>
+    <p id="loc-status" class="muted">Finding your location…</p>
+    <div id="map-wrap" class="map-wrap">
+      <div id="map"></div>
+      <button id="fs-open" class="map-btn map-btn-tr" aria-label="Full screen map" title="Full screen">⛶</button>
+      <button id="locate-btn" class="map-pill" aria-label="Use my location">📍 Use my location</button>
+      <button id="reports-btn" class="map-chip on" aria-pressed="true" title="Show problems already reported">👁 Reported <span id="reports-count"></span></button>
+      <div class="fs-bar">
+        <button id="fs-close" class="map-btn" aria-label="Close full screen">✕</button>
+        <span class="fs-title">Drag the pin onto the problem</span>
+      </div>
+      <button id="fs-done" class="big-btn fs-done">✓ Use this spot</button>
+    </div>
+    <p class="hint">Drag the pin or tap the map if it's not quite right.</p>
+    <details id="pc-box" class="pc-box">
+      <summary>Not there right now? Enter a postcode</summary>
+      <div class="pc-row">
+        <input id="pc" type="text" placeholder="e.g. N1 6DR" autocomplete="off" autocapitalize="characters" maxlength="8" list="pc-list">
+        <button id="pc-go" class="pc-go">Go</button>
+      </div>
+      <datalist id="pc-list"></datalist>
+      <p id="pc-msg" class="hint"></p>
+    </details>
+    <input id="note" type="text" placeholder="Anything to add? (optional)" maxlength="200">
+    <button id="send" class="big-btn" disabled>Send report</button>
+    <button id="retake" class="link-btn">Retake photo</button>
+  </section>
+
+  <!-- Step 3: progress + result -->
+  <section id="step-result" class="card" hidden>
+    <ol id="progress" class="progress"></ol>
+    <div id="reply" class="reply" hidden></div>
+    <a id="track" class="big-btn" hidden>See progress</a>
+    <button id="again" class="link-btn" hidden>Report another</button>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const HUB = [51.5285, -0.0835];  // Encode Hub, Pitfield St: fallback centre
+let photoFile = null, map = null, pin = null;
+
+function show(step) {
+  for (const s of ["step-photo", "step-locate", "step-result"]) $(s).hidden = s !== step;
+  window.scrollTo(0, 0);
+}
+
+function initMap(latlng) {
+  if (!map) {
+    map = L.map("map", { zoomControl: false }).setView(latlng, 18);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
+    pin = L.marker(latlng, { draggable: true }).addTo(map);
+    map.on("click", (e) => pin.setLatLng(e.latlng));
+  } else {
+    map.setView(latlng, 18);
+    pin.setLatLng(latlng);
+  }
+  setTimeout(() => map.invalidateSize(), 50);
+  $("send").disabled = false;
+  Nearby.attach();
+}
+
+// ---- Existing reports on the map ----
+// Lazy: nothing loads until the map is shown and the layer is on, and only at street zoom.
+// Cached: the viewport is split into fixed grid cells; each cell is fetched once per TTL,
+// so panning back and forth costs nothing. Pins are canvas-drawn and keyed by ref.
+// Details and photos load only when a pin is tapped.
+const Nearby = (() => {
+  const CELL = 0.01, TTL = 60000, MIN_ZOOM = 15, MAX_CELLS = 16;
+  const COLORS = { pothole: "#F2C230", fly_tipping: "#C2410C", streetlight: "#3B82F6", other: "#8B8F84" };
+  const LABELS = { pothole: "Pothole", fly_tipping: "Fly-tipping", streetlight: "Streetlight", other: "Street problem" };
+  const cells = new Map();   // "x:y" -> { t, pins } or { t, pending: Promise }
+  const markers = new Map(); // ref -> marker
+  const details = new Map(); // ref -> issue detail (cached after first open)
+  let layer, renderer, on = true, attached = false, timer;
+
+  function attach() {
+    if (attached) return;
+    attached = true;
+    renderer = L.canvas({ padding: 0.3 });
+    layer = L.layerGroup().addTo(map);
+    map.on("moveend", () => { clearTimeout(timer); timer = setTimeout(refresh, 250); });
+    $("reports-btn").onclick = toggle;
+    refresh();
+  }
+
+  function toggle() {
+    on = !on;
+    $("reports-btn").classList.toggle("on", on);
+    $("reports-btn").setAttribute("aria-pressed", on);
+    on ? (layer.addTo(map), refresh()) : (map.removeLayer(layer), ($("reports-count").textContent = ""));
+  }
+
+  async function loadCell(x, y) {
+    const key = `${x}:${y}`, c = cells.get(key);
+    if (c && Date.now() - c.t < TTL) return c.pending || c.pins;
+    const w = x * CELL, s = y * CELL;
+    const pending = fetch(`/api/issues/area?w=${w.toFixed(4)}&s=${s.toFixed(4)}&e=${(w + CELL).toFixed(4)}&n=${(s + CELL).toFixed(4)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => [])
+      .then((pins) => { cells.set(key, { t: Date.now(), pins }); return pins; });
+    cells.set(key, { t: Date.now(), pending });
+    return pending;
+  }
+
+  async function refresh() {
+    if (!on || !map) return;
+    if (map.getZoom() < MIN_ZOOM) { $("reports-count").textContent = "· zoom in"; return; }
+    const b = map.getBounds();
+    const x0 = Math.floor(b.getWest() / CELL), x1 = Math.floor(b.getEast() / CELL);
+    const y0 = Math.floor(b.getSouth() / CELL), y1 = Math.floor(b.getNorth() / CELL);
+    const jobs = [];
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) if (jobs.length < MAX_CELLS) jobs.push(loadCell(x, y));
+    const pins = (await Promise.all(jobs)).flat();
+    for (const p of pins) if (!markers.has(p.ref)) markers.set(p.ref, addPin(p));
+    const visible = pins.filter((p) => b.contains(p.ll)).length;
+    $("reports-count").textContent = visible ? `· ${visible}` : "· none here";
+  }
+
+  function addPin(p) {
+    const m = L.circleMarker(p.ll, {
+      renderer, radius: p.n > 1 ? 9 : 7, weight: p.sev === "urgent" ? 3 : 2,
+      color: p.sev === "urgent" ? "#B3261E" : "#1B1E1B", fillColor: COLORS[p.cat] || COLORS.other, fillOpacity: 0.9,
+    }).addTo(layer);
+    m.bindPopup(() => popupHtml(p), { maxWidth: 240 });
+    m.on("popupopen", () => loadDetail(p, m));
+    return m;
+  }
+
+  function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
+
+  function popupHtml(p, d) {
+    const photo = d && d.photos && d.photos[0]
+      ? `<img src="/uploads/${encodeURIComponent(d.photos[0])}" loading="lazy" decoding="async" class="pop-img" alt="">` : "";
+    return `<div class="pop">${photo}
+      <b>${esc(LABELS[p.cat] || "Problem")}</b>${p.sev === "urgent" ? ' <span class="badge urgent">URGENT</span>' : ""}
+      <div>${esc(p.s)}</div>
+      <div class="pop-meta">${p.n} report${p.n > 1 ? "s" : ""}${d && d.council ? " · " + esc(d.council) : ""}</div>
+      <button class="pop-btn" data-ref="${esc(p.ref)}">This is my problem: add my photo</button>
+      <a class="pop-link" href="/r/${encodeURIComponent(p.ref)}" target="_blank" rel="noopener">See progress</a></div>`;
+  }
+
+  async function loadDetail(p, m) {
+    if (!details.has(p.ref)) {
+      try { details.set(p.ref, await fetch(`/api/issues/${encodeURIComponent(p.ref)}`).then((r) => r.json())); }
+      catch { return; }
+    }
+    m.setPopupContent(popupHtml(p, details.get(p.ref)));
+  }
+
+  // "Same problem" button: snap the reporter's pin onto the existing issue so it dedupes.
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".pop-btn");
+    if (!btn) return;
+    const m = markers.get(btn.dataset.ref);
+    if (!m) return;
+    pin.setLatLng(m.getLatLng());
+    map.closePopup();
+    $("loc-status").textContent = "📌 Pinned to the existing report: your photo will be added to it.";
+  });
+
+  return { attach };
+})();
+
+function locate(fresh = false) {
+  $("loc-status").textContent = "Finding your location…";
+  $("locate-btn").classList.add("busy");
+  const done = () => $("locate-btn").classList.remove("busy");
+  if (!navigator.geolocation) { done(); return fallback("Location isn't available: tap the map or enter a postcode."); }
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      done();
+      $("loc-status").textContent = `📍 Your location, accurate to about ${Math.round(p.coords.accuracy)} m.`;
+      initMap([p.coords.latitude, p.coords.longitude]);
+      map.setZoom(19);  // get close so the pin can be placed on the exact spot
+    },
+    () => { done(); fallback("Couldn't get your location: tap the map or enter a postcode."); },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: fresh ? 0 : 30000 });
+}
+
+// ---- Full-screen map: big target for placing the pin, easy to leave ----
+function setFullscreen(on) {
+  $("map-wrap").classList.toggle("fullscreen", on);
+  document.body.classList.toggle("no-scroll", on);
+  if (on) history.pushState({ fs: true }, "");  // phone Back button closes it
+  setTimeout(() => { map.invalidateSize(); map.panTo(pin.getLatLng()); }, 60);
+}
+$("fs-open").onclick = () => setFullscreen(true);
+$("fs-close").onclick = $("fs-done").onclick = () => history.state?.fs ? history.back() : setFullscreen(false);
+window.addEventListener("popstate", () => { if ($("map-wrap").classList.contains("fullscreen")) setFullscreen(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("map-wrap").classList.contains("fullscreen")) history.back(); });
+$("locate-btn").onclick = () => locate(true);
+
+// ---- Postcode lookup (postcodes.io: free UK postcode data, no key) ----
+let pcTimer = null;
+$("pc").addEventListener("input", () => {
+  clearTimeout(pcTimer);
+  const q = $("pc").value.trim();
+  if (q.length < 2) return;
+  pcTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(q)}/autocomplete?limit=6`);
+      const d = await r.json();
+      // "N1 6" must not suggest N16…: keep matches whose outward code equals what was typed
+      const out = q.includes(" ") ? q.toUpperCase().split(" ")[0] + " " : "";
+      const hits = (d.result || []).filter((p) => !out || p.startsWith(out));
+      $("pc-list").innerHTML = hits.map((p) => `<option value="${p}">`).join("");
+    } catch {}
+  }, 200);
+});
+async function goPostcode() {
+  const q = $("pc").value.trim();
+  if (!q) return;
+  $("pc-msg").textContent = "Looking up…";
+  try {
+    const r = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(q)}`);
+    const d = await r.json();
+    if (!r.ok || !d.result) throw new Error();
+    const { latitude, longitude, postcode, admin_district } = d.result;
+    initMap([latitude, longitude]);
+    map.setZoom(18);
+    $("pc-msg").textContent = "";
+    $("loc-status").textContent = `📮 ${postcode}, ${admin_district}. Now drag the pin onto the exact spot.`;
+    $("pc-box").open = false;
+  } catch {
+    $("pc-msg").textContent = "Couldn't find that postcode. Check it and try again.";
+  }
+}
+$("pc-go").onclick = goPostcode;
+$("pc").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); goPostcode(); } });
+
+function fallback(msg) {
+  $("loc-status").textContent = msg;
+  initMap(HUB);
+}
+
+$("photo").addEventListener("change", (e) => {
+  photoFile = e.target.files[0];
+  if (!photoFile) return;
+  $("preview").src = URL.createObjectURL(photoFile);
+  show("step-locate");
+  locate();
+});
+
+$("retake").onclick = () => { $("photo").value = ""; show("step-photo"); };
+$("again").onclick = () => location.reload();
+
+// Progress lines shown while the agent works; the real answer replaces them.
+const STAGES = ["Looking at your photo", "Estimating the size", "Finding who owns this road", "Checking for existing reports"];
+
+async function send() {
+  show("step-result");
+  const list = $("progress");
+  list.innerHTML = "";
+  let i = 0;
+  const addStage = () => {
+    if (i > 0) list.children[i - 1].classList.add("done");
+    if (i < STAGES.length) {
+      const li = document.createElement("li");
+      li.textContent = STAGES[i++] + "…";
+      list.appendChild(li);
+    }
+  };
+  addStage();
+  const timer = setInterval(addStage, 1100);
+
+  const ll = pin.getLatLng();
+  const form = new FormData();
+  form.append("photo", await shrink(photoFile));
+  form.append("lat", ll.lat);
+  form.append("lon", ll.lng);
+  if ($("note").value.trim()) form.append("note", $("note").value.trim());
+
+  try {
+    const res = await fetch("/api/report", { method: "POST", body: form });
+    const data = await res.json();
+    clearInterval(timer);
+    if (!res.ok) throw new Error(data.detail || "Something went wrong");
+    [...list.children].forEach((li) => li.classList.add("done"));
+    renderReply(data);
+  } catch (err) {
+    clearInterval(timer);
+    $("reply").hidden = false;
+    $("reply").className = "reply error";
+    $("reply").textContent = err.message + " Your photo wasn't lost: tap Send again.";
+    $("again").hidden = false;
+  }
+}
+
+function renderReply(d) {
+  const r = $("reply");
+  r.hidden = false;
+  r.className = "reply " + (d.severity === "urgent" ? "urgent" : "");
+  r.innerHTML = "";
+  if (d.severity) {
+    const badge = document.createElement("span");
+    badge.className = "badge " + d.severity;
+    badge.textContent = d.severity === "urgent" ? "URGENT" : "LOGGED";
+    r.appendChild(badge);
+  }
+  for (const line of d.reply.split("\n")) {
+    if (line.startsWith("Track it:")) continue;
+    const p = document.createElement("p");
+    p.textContent = line;
+    r.appendChild(p);
+  }
+  if (d.ref) { $("track").href = "/r/" + d.ref; $("track").hidden = false; }
+  $("again").hidden = false;
+}
+
+// Downscale big phone photos before upload: faster send, faster AI.
+async function shrink(file, max = 1600) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size < 1.5e6) return file;
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale);
+    c.height = Math.round(bmp.height * scale);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise((ok) => c.toBlob((b) => ok(new File([b], "photo.jpg", { type: "image/jpeg" })), "image/jpeg", 0.85));
+  } catch { return file; }
+}
+
+$("send").onclick = send;
+fetch("/api/mode").then((r) => r.json()).then((m) => { $("test-banner").hidden = !m.test_mode; }).catch(() => {});
+</script>
+</body>
+</html>

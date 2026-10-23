@@ -1,0 +1,29 @@
+[
+  {
+    "_id": "pothole",
+    "label": "Pothole",
+    "emoji": "🕳️",
+    "fields": ["width_cm", "depth_mm", "surface"],
+    "size_scale": null,
+    "risk_weights": {"depth_mm": 1.0, "surface_cycle_lane": 1.5},
+    "reference_tips": "Put a £1 coin (23.4 mm), your shoe or your finger next to it. Only when safe."
+  },
+  {
+    "_id": "fly_tipping",
+    "label": "Fly-tipping",
+    "emoji": "🗑️",
+    "fields": ["size", "items", "hazards"],
+    "size_scale": ["bag", "car_boot", "small_van", "transit_van", "tipper_lorry"],
+    "risk_weights": {"hazard": 3.0},
+    "reference_tips": "Step back so the whole pile is in the photo."
+  },
+  {
+    "_id": "streetlight",
+    "label": "Streetlight",
+    "emoji": "💡",
+    "fields": ["column_id", "fault"],
+    "size_scale": null,
+    "risk_weights": {},
+    "reference_tips": "Include the number plate stuck on the lamp post."
+  }
+]

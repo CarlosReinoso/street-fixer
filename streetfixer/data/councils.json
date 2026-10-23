@@ -1,0 +1,16 @@
+{
+  "_note": "Per-council rules (taxonomic memory). 'default' applies to every London borough unless overridden. Values marked verify=true are working assumptions, not confirmed council policy: check each council's highways policy before relying on them.",
+  "default": {
+    "pothole_threshold_mm": {"road": 40, "pavement": 20, "cycle_lane": 20},
+    "response_days": {"urgent": 1, "standard": 28},
+    "channel": "fixmystreet",
+    "category_names": {"pothole": "Pothole", "fly_tipping": "Flytipping", "streetlight": "Street lighting"},
+    "verify": true
+  },
+  "pilot": ["Hackney", "Islington", "Tower Hamlets"],
+  "overrides": {
+    "Hackney": {},
+    "Islington": {},
+    "Tower Hamlets": {}
+  }
+}

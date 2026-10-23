@@ -1,0 +1,10 @@
+# secrets
+.env
+.env.*
+!.env.example
+# local / generated
+.venv/
+__pycache__/
+logs/
+uploads/
+photos/

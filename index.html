@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Encode Hack HQ</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#14161a; --muted:#5d6470; --line:#e3e6eb;
+  --accent:#1f7ae0; --accent-soft:#e6f0fc; --good:#1a8a4a; --good-soft:#e5f5ec;
+  --warn:#b4630a; --warn-soft:#fdf1e2; --bad:#c23b3b; --chip:#eef0f3;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1115; --panel:#171a20; --ink:#e8eaee; --muted:#9aa2ae; --line:#2a2f38;
+    --accent:#5aa2f0; --accent-soft:#1a2a3d; --good:#4cc485; --good-soft:#15291f;
+    --warn:#e6a04f; --warn-soft:#2e2215; --bad:#e46a6a; --chip:#232831;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1115; --panel:#171a20; --ink:#e8eaee; --muted:#9aa2ae; --line:#2a2f38;
+  --accent:#5aa2f0; --accent-soft:#1a2a3d; --good:#4cc485; --good-soft:#15291f;
+  --warn:#e6a04f; --warn-soft:#2e2215; --bad:#e46a6a; --chip:#232831;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 16px 64px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+h1{font-size:26px;margin:0;letter-spacing:-.02em}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px}
+.sub{color:var(--muted);margin:4px 0 0}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button,.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 12px;border-radius:999px;cursor:pointer;font:inherit;font-size:13px}
+nav button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+section{margin-top:28px}
+.stat .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.stat .value{font-size:28px;font-weight:650;font-variant-numeric:tabular-nums;margin:4px 0 2px}
+.stat .note{font-size:13px;color:var(--muted)}
+.stat.next{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.stat.done .value{color:var(--muted);text-decoration:line-through}
+.chip{display:inline-block;background:var(--chip);border-radius:999px;padding:2px 9px;font-size:12px;margin:2px 4px 2px 0;white-space:nowrap}
+.chip.t-real{background:var(--good-soft);color:var(--good)}
+.chip.t-agents{background:var(--accent-soft);color:var(--accent)}
+.chip.b{background:var(--warn-soft);color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.tablewrap{overflow-x:auto}
+.unver{color:var(--warn);font-size:12px}
+.idea{display:flex;flex-direction:column;gap:8px;position:relative}
+.idea h3{margin:0;font-size:17px;padding-right:72px}
+.idea .num{color:var(--muted);font-weight:500}
+.idea p{margin:0;color:var(--muted);font-size:14px}
+.idea .row{font-size:13px}
+.idea .row b{color:var(--ink);font-weight:600}
+.idea.top{border-color:var(--good)}
+.pick{position:absolute;top:14px;right:14px}
+.pick[aria-pressed="true"]{background:var(--good);color:#fff;border-color:var(--good)}
+.score{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.bar{display:inline-block;width:46px;height:6px;background:var(--chip);border-radius:3px;vertical-align:middle;margin-left:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.check{list-style:none;padding:0;margin:0}
+.check li{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--line)}
+.check li:last-child{border-bottom:0}
+.check input{margin-top:4px;accent-color:var(--good);width:16px;height:16px;flex:none}
+.check label{cursor:pointer}
+.check input:checked + label{color:var(--muted);text-decoration:line-through}
+.when{font-weight:600;font-variant-numeric:tabular-nums;min-width:96px;flex:none}
+.progress{height:8px;background:var(--chip);border-radius:4px;overflow:hidden;margin:6px 0 12px}
+.progress i{display:block;height:100%;background:var(--good);transition:width .3s}
+.callout{background:var(--warn-soft);color:var(--ink);border-left:4px solid var(--warn);padding:10px 14px;border-radius:8px;font-size:14px;margin-top:12px}
+.role h3{margin:0 0 4px;font-size:15px}
+.role p{margin:0;color:var(--muted);font-size:14px}
+input.name{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;margin-top:8px}
+footer{margin-top:40px;color:var(--muted);font-size:12px}
+a{color:var(--accent)}
+@media (max-width:600px){h1{font-size:22px}.stat .value{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Encode London Hackathon — HQ</h1>
+    <p class="sub">23–25 Oct 2026 · Encode Hub, 41 Pitfield St, N1 6DA · 10 ideas to start from</p>
+  </div>
+  <button class="btn" id="themeBtn" type="button">Toggle theme</button>
+</header>
+
+<!-- MongoDB focus -->
+<section style="margin-top:0">
+  <h2>MongoDB Atlas bounty — £3,500 / £2,000 / £1,300</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h3 style="margin:0 0 8px;font-size:16px">How it's scored</h3>
+      <ul class="check">
+        <li><span class="when">Core</span><span>Atlas is the <b>core backend data store</b> of an app solving a real-world problem.</span></li>
+        <li><span class="when">Points</span><span>At least one of the 6 features — <b>more features = more points</b>.</span></li>
+        <li><span class="when">Submit</span><span>GitHub repo + <b>3-min demo that shows MongoDB in use</b>.</span></li>
+        <li><span class="when">Credit</span><span>$100 Atlas credit per person at the MongoDB booth.</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 8px;font-size:16px">The 6 features</h3>
+      <ul class="check">
+        <li><span class="when">AS</span><span>Atlas Search — full-text, fuzzy, autocomplete, facets</span></li>
+        <li><span class="when">VS</span><span>Vector Search — semantic / image similarity</span></li>
+        <li><span class="when">HY</span><span>Hybrid Search — <code>$rankFusion</code> / <code>$scoreFusion</code> (text + vector)</span></li>
+        <li><span class="when">AE</span><span>Automated Embedding — Atlas embeds on insert, no pipeline</span></li>
+        <li><span class="when">SP</span><span>Stream Processing — real-time windows over event streams</span></li>
+        <li><span class="when">VO</span><span>Voyage AI — multimodal embeddings, reranking</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="card tablewrap" style="margin-top:16px">
+    <table>
+      <thead><tr><th>Idea</th><th>AS</th><th>VS</th><th>HY</th><th>AE</th><th>SP</th><th>VO</th><th>Bonus</th><th>Fit</th></tr></thead>
+      <tbody id="matrix"></tbody>
+    </table>
+  </div>
+  <div class="callout"><b>Recommendation: #4 Street Fixer.</b> It uses all 6 features, each for a real job, and has the most visual MongoDB moment: Voyage multimodal vectors collapse duplicate photos ("31 reports → 1 pothole"), and Stream Processing turns incoming reports into live hotspots on the map while the audience watches. The runner-up for the bounty is #1 Claim Appeal, because exact medical codes plus fuzzy descriptions is a natural fit for hybrid search.</div>
+  <div class="callout"><b>From the MongoDB talk:</b> qualify by using MongoDB; you score more for each feature you use <b>and visibly demonstrate</b>. "Focus on the quality of the idea and use case, then build quality. You're not load testing." "Accurate AI is never a model problem": your moat is the data your users generate. Install MongoDB's <b>agent skills</b> in Claude Code / Hermes. The $100 credit runs an <b>M30</b> (8 GB, dedicated) for ~154 h, enough for the weekend, so pause it after. The speaker said time series and long analytics queries are <b>weak spots</b>, so don't lean on them. Stream Processing wasn't mentioned in the talk.</div>
+  <div class="callout"><b>Demo trick:</b> add an "Under the hood" panel that lights up each Atlas feature (and shows its pipeline) as it runs. Judges score features you can <b>show</b>.</div>
+  <div class="callout"><b>From MongoDB's workshop slides:</b> (1) <b>MongoDB + Voyage in one place</b>: unstructured data → embedding → vector search → <b>reranker</b> → LLM, so include the reranker. (2) <b>Atlas as agent memory</b>: State / Short-term / Long-term ("let's start where we left off", "this customer's history"), with frameworks LangGraph, CrewAI, Autogen and MCP. (3) <b>Automated Embedding is live</b>: text and vector in one collection, and you query in plain English. <b>Credit code: MKT-ENCODELDN-100</b> (account.mongodb.com → Billing → Apply Code).</div>
+  <div class="callout"><b>Ask Robin/Maja at the booth:</b> which cluster tier supports Automated Embedding? Does the $100 credit cover a Stream Processing instance? How do we get Voyage API access (via an Atlas model API key)?</div>
+</section>
+
+<!-- Ideas -->
+<section>
+  <h2>15 ideas — sorted by MongoDB fit</h2>
+  <nav id="filters" aria-label="Filter ideas">
+    <button type="button" data-f="all" aria-pressed="true">All</button>
+    <button type="button" data-f="mongo">All 6 features</button>
+    <button type="button" data-f="real">Real World</button>
+    <button type="button" data-f="agents">Agents That Ship</button>
+    <button type="button" data-f="top">Top picks</button>
+    <button type="button" data-f="picked">Our shortlist</button>
+  </nav>
+  <div class="grid g2" id="ideas" style="margin-top:14px"></div>
+</section>
+
+<footer>Your shortlist is saved in this browser only. Judge links come from public sources and some are unverified.</footer>
+</div>
+
+<script>
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('encode:'+k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('encode:'+k, JSON.stringify(v)); }catch(e){} }
+};
+
+// Theme
+const themeBtn = document.getElementById('themeBtn');
+const savedTheme = store.get('theme', null);
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+themeBtn.onclick = () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  store.set('theme', next);
+};
+
+// Ideas
+const ideas = [
+  {n:1, name:'Claim Appeal Agent', top:true, tracks:['agents'],
+   pitch:'Snap a rejected insurance claim or medical bill → Gemini reads it, finds missing codes/docs (vector search over public coding guidance), drafts the appeal, chases on a schedule.',
+   bounties:['Gemini','MongoDB'], judges:'Penelope ×2, DeepMind, MongoDB',
+   hermes:'Sub-agents: reader → coder lookup → drafter → cron chaser',
+   demo:'Crumpled denial letter photo → ready-to-send appeal in 60s', scores:{impact:5,wow:3,risk:3}},
+  {n:2, name:'Tradie Back Office', top:true, tracks:['agents'],
+   pitch:'Plumber sends WhatsApp voice notes + job photos → quote → invoice → payment chasers, optional USDC pay link via Arc. Literally the slide example and Saint’s target user.',
+   bounties:['Saint','MongoDB','Gemini','Arc'], judges:'Saint, MongoDB, DeepMind, Genius, Advent',
+   hermes:'WhatsApp gateway in, cron for chasing, skills per document type',
+   demo:'Voice note on stage → invoice lands in the client’s inbox live', scores:{impact:4,wow:4,risk:4}},
+  {n:3, name:'Bug → PR from a phone video', tracks:['agents'],
+   pitch:'User screen-records a bug → agent reproduces on Android emulator via Droidrun → fixes → opens a PR with before/after video.',
+   bounties:['Gemini','MongoDB'], judges:'Droidrun, CoreWeave, DeepMind',
+   hermes:'Terminal backend (Docker) + Droidrun via MCP; delegate repro and fix',
+   demo:'Merged PR with repro video', scores:{impact:3,wow:5,risk:1}},
+  {n:4, name:'Street Fixer', top:true, tracks:['real','agents'],
+   pitch:'Pedestrians and cyclists photograph a pothole, fly-tip or blocked drain on WhatsApp → Gemini describes it → the agent checks whether it’s already known (location + meaning + photo), files it in the council’s own category, chases it, and builds a dated evidence pack for anyone claiming damage. The issue history is the data moat.',
+   bounties:['Gemini','MongoDB'], judges:'DeepMind, MongoDB (geospatial + Stream Processing)',
+   hermes:'Telegram gateway intake; cron re-checks report status',
+   demo:'Audience snaps a photo → pin drops on the live map', scores:{impact:4,wow:4,risk:4}},
+  {n:5, name:'Surplus Runner', tracks:['real'],
+   pitch:'Café photographs end-of-day leftovers → agent lists items, matches nearby charities/food banks, books pickup.',
+   bounties:['Gemini','MongoDB'], judges:'DeepMind, MongoDB, Advent',
+   hermes:'Cron at closing time; sub-agent per charity contact',
+   demo:'Tray of pastries → pickup confirmed', scores:{impact:4,wow:3,risk:4}},
+  {n:6, name:'Damp & Mould Chaser', top:true, tracks:['real','agents'],
+   pitch:'Renter photographs damp → timestamped evidence pack, Awaab’s Law deadlines, emails landlord, chases on timer, escalates to council/ombudsman.',
+   bounties:['Saint','MongoDB','Gemini'], judges:'DeepMind, MongoDB, Saint, Advent — and every London renter in the audience',
+   hermes:'Cron deadlines, skills per escalation stage, Saint as email persona',
+   demo:'Mould photo → landlord letter sent + countdown to legal deadline', scores:{impact:5,wow:4,risk:4}},
+  {n:7, name:'Charity Grant Agent', tracks:['agents'],
+   pitch:'Small charity drops its docs → agent finds matching grants (Treg search/scrape), drafts applications, tracks deadlines.',
+   bounties:['MongoDB','Gemini','Treg'], judges:'MongoDB (hybrid search), DeepMind',
+   hermes:'MCP to Treg; research sub-agents; cron deadline reminders',
+   demo:'3 matched grants + 1 drafted application', scores:{impact:4,wow:3,risk:4}},
+  {n:8, name:'Agent Payroll', tracks:['agents'],
+   pitch:'Every sub-agent gets a budget (Treg credits / USDC wallet), identity and Mongo audit trail; manager dashboard.',
+   bounties:['MongoDB','Arc','Treg'], judges:'Tenor, Genius, CoreWeave',
+   hermes:'Wrap delegate_task with budget + logging',
+   demo:'Agent hits budget cap and asks for approval', scores:{impact:2,wow:3,risk:3}},
+  {n:9, name:'City Soundscape', tracks:['real'],
+   pitch:'Park audio + photos → Gemini species/noise ID → log to iNaturalist/GBIF; biodiversity map on Mongo time series.',
+   bounties:['Gemini','MongoDB'], judges:'DeepMind (multimodal), MongoDB',
+   hermes:'Telegram voice-note intake; nightly cron digest',
+   demo:'Play birdsong → species appears on the map', scores:{impact:3,wow:4,risk:3}},
+  {n:11, name:'CareLog — family carer memory', top:true, tracks:['real','agents'],
+   pitch:'Family carers send voice notes, photos of prescriptions and hospital letters → one shared long-term memory for Mum. Ask "what did the consultant say in March?" or "when is her repeat due?" The agent chases repeat prescriptions and books appointments.',
+   bounties:['MongoDB','Gemini','Saint'], judges:'MongoDB (agent memory, as on their slide), Penelope ×2, DeepMind, Saint',
+   hermes:'WhatsApp group gateway; Atlas as state + short-term + long-term memory; cron for repeats',
+   demo:'New sibling joins the group and asks "catch me up". The agent answers from 3 months of memory, with sources.', scores:{impact:5,wow:4,risk:4}},
+  {n:12, name:'Fix-It Memory — repair before you replace', tracks:['real'],
+   pitch:'Photo of a broken boiler, washing machine or bike → identifies the model → RAG over manuals and repair guides (unstructured PDFs, reranked) → step-by-step fix. It remembers your home: "your Worcester 30i, last serviced May, same E9 fault as last winter."',
+   bounties:['MongoDB','Gemini'], judges:'MongoDB (the unstructured data → reranker → LLM slide), DeepMind (multimodal)',
+   hermes:'Telegram photo intake; skills per appliance family; long-term memory of each home',
+   demo:'Error-code photo → the exact manual page + fix in 20s, then "you had this last year"', scores:{impact:4,wow:4,risk:4}},
+  {n:13, name:'Business Account in a Day', tracks:['agents'],
+   pitch:'From the MongoDB talk: a top UK bank takes ~20 days to open a business account. Founders send documents over WhatsApp → the agent pulls Companies House data, checks each item against the bank’s policy (hybrid search + rerank over policy PDFs), asks only for what’s missing, and hands the bank a complete KYB pack. Half-finished applications resume where you left off.',
+   bounties:['MongoDB','Gemini','Saint'], judges:'MongoDB (their own customer story), Advent, Genius, Saint',
+   hermes:'WhatsApp gateway; sub-agents per check (identity, ownership, address); state memory per application',
+   demo:'Upload 3 docs → "you only need your proof of address" → complete pack in minutes', scores:{impact:4,wow:3,risk:4}},
+  {n:14, name:'Found It — London lost & found', tracks:['real'],
+   pitch:'Venues, cafés and transport staff photograph found items; owners describe what they lost in plain words. Multimodal + text + location matching reunites them, and the agent arranges pickup.',
+   bounties:['MongoDB','Gemini'], judges:'MongoDB, DeepMind (multimodal), audience',
+   hermes:'Two gateways (finders / losers); cron re-matches nightly; long-term memory of open claims',
+   demo:'Live at the venue: someone "loses" a hoodie; it’s matched to a finder’s photo in seconds', scores:{impact:3,wow:5,risk:5}},
+  {n:15, name:'Atlas Memory for Hermes', tracks:['agents'],
+   pitch:'Open-source memory layer: Hermes stores state, short-term, long-term and taxonomic memory in Atlas, with Auto-Embedding, hybrid recall and Voyage rerank. Works with any orchestrator, as MongoDB pitched. Ship it inside one real use case (e.g. Street Fixer) so it isn’t just infrastructure.',
+   bounties:['MongoDB','Gemini'], judges:'MongoDB, Tenor, CoreWeave',
+   hermes:'It IS the Hermes upgrade: a memory provider/MCP tool backed by Atlas',
+   demo:'Kill the agent mid-task → restart → "let’s pick up where we left off"', scores:{impact:3,wow:3,risk:3}},
+  {n:10, name:'Remote Hands for Parents', tracks:['real','agents'],
+   pitch:'Text "book Mum’s GP slot / set up her video call" → agent operates her Android via Droidrun and reports back with screenshots.',
+   bounties:['Gemini','MongoDB'], judges:'Droidrun, DeepMind',
+   hermes:'WhatsApp gateway; Droidrun as MCP tool',
+   demo:'Phone mirrored on screen tapping through by itself', scores:{impact:4,wow:5,risk:2}}
+];
+
+// MongoDB fit per idea: core features used + bonus Atlas capabilities
+const FEATS = ['AS','VS','HY','AE','SP','VO'];
+const mongo = {
+  11:{f:FEATS, bonus:['Agent memory'],
+     how:'This is MongoDB’s own "Agentic AI" slide: Atlas holds state, short-term memory (this chat) and long-term memory (the patient’s history). Auto-Embedding on every note and letter; hybrid search for drug names (exact) plus symptoms (semantic); Voyage rerank; Stream Processing spots missed doses and due repeats.'},
+  12:{f:['AS','VS','HY','AE','VO'], bonus:['Agent memory'],
+     how:'This is MongoDB’s "MongoDB + Voyage" slide: unstructured manuals → Auto-Embedding → vector search → Voyage reranker → Gemini. Hybrid search because error codes ("E9") are exact tokens; Atlas Search for model numbers; long-term memory of each household’s appliances.'},
+  4:{f:FEATS, bonus:['Geospatial','Agent memory','Flexible schema'],
+     how:'One <b>issue document</b> embeds every report, photo ref, council reply and status change ("data accessed together belongs together"); its fields vary by type (pothole depth, fly-tip contents, streetlight ID), which is the flexible-schema story. <b>Auto-Embedding</b> on Gemini’s photo description, queried in plain English. <b>Dedupe</b>: $geoNear radius → hybrid ($rankFusion) on description → <b>Voyage rerank</b> → Gemini confirms "same issue". <b>Atlas Search</b> facets by council/type. <b>Memory</b>: short-term = this chat; long-term = reporter + location history ("flooded 4× since Jan"); taxonomic = free text mapped to each council’s category list. <b>Stream Processing</b>: new reports → live hotspots. Severity is grounded in past outcomes, so per MongoDB "accurate AI is never a model problem".'},
+  1:{f:FEATS, bonus:['Agent memory'],
+     how:'Medical codes are exact tokens with fuzzy descriptions, the textbook case for $rankFusion (Atlas Search on code + vector on meaning). Auto-Embedding on guideline chunks; Voyage rerank picks the right rule; Stream Processing watches claim-status events to trigger chasers.'},
+  2:{f:FEATS, bonus:['Agent memory'],
+     how:'Voyage multimodal: job photo → similar past jobs → price the quote. Atlas Search autocomplete on customers and parts; hybrid on "15mm copper elbow"; Auto-Embedding on job notes; Stream Processing flags invoices overdue by more than 7 days → chaser.'},
+  6:{f:FEATS, bonus:['Agent memory'],
+     how:'Hybrid search over Awaab’s Law / HHSRS guidance and ombudsman decisions; Voyage multimodal severity matching against past cases; Auto-Embedding on case notes; Stream Processing runs the deadline clock → escalate; Atlas Search across all landlord correspondence.'},
+  7:{f:['AS','VS','HY','AE','VO'], bonus:[],
+     how:'Hybrid search over grants (eligibility keywords + mission meaning); Voyage rerank; Auto-Embedding on charity docs; Atlas Search facets by deadline and amount.'},
+  9:{f:['VS','AE','SP','VO'], bonus:['Time series','Geospatial'],
+     how:'Voyage multimodal on photos; time-series collection for audio detections; Stream Processing for live species counts; geo queries per park.'},
+  5:{f:['AS','VS','SP'], bonus:['Geospatial'],
+     how:'Geo match café → nearest charity; Stream Processing for closing-time surplus events; vector match of food type to charity needs.'},
+  3:{f:['VS','AE','VO'], bonus:[],
+     how:'voyage-code-4 embeddings to find the code behind a bug; mostly a code agent, so MongoDB stays secondary.'},
+  8:{f:['AS','SP'], bonus:['Time series','Change streams'],
+     how:'Spend events streamed and capped in real time; audit-log search. No natural vector use.'},
+  10:{f:['AS','VS'], bonus:[],
+     how:'Agent memory of how-to steps per app. MongoDB is incidental.'}
+};
+Object.assign(mongo, {
+  13:{f:['AS','VS','HY','AE','VO'], bonus:['Flexible schema','Agent memory'],
+      how:'Each application is one document whose shape varies by company type (sole trader vs Ltd vs LLP). Auto-Embedding + hybrid + rerank over bank policy and Companies House data; Atlas Search for officer names; state memory resumes half-done applications.'},
+  14:{f:['AS','VS','HY','AE','VO'], bonus:['Geospatial','Agent memory'],
+      how:'Voyage multimodal vectors on item photos; Auto-Embedding on owner descriptions; hybrid ("black North Face backpack, laptop inside") + rerank; $geoNear by where it was lost; Atlas Search on serials and brands.'},
+  15:{f:['AS','VS','HY','AE','VO'], bonus:['Agent memory'],
+      how:'Memory collections for state, short-term, long-term and taxonomic memory; Auto-Embedding on every memory; hybrid recall + rerank; Atlas Search over the transcript history.'}
+});
+const fit = n => mongo[n].f.length + mongo[n].bonus.length * 0.5;
+ideas.sort((a, b) => fit(b.n) - fit(a.n));
+
+document.getElementById('matrix').innerHTML = ideas.map(i => {
+  const m = mongo[i.n];
+  return `<tr><td><b>#${i.n}</b> ${i.name}</td>${FEATS.map(k => `<td>${m.f.includes(k) ? '<span style="color:var(--good);font-weight:700">●</span>' : '<span style="color:var(--line)">○</span>'}</td>`).join('')}<td>${m.bonus.map(b => `<span class="chip">${b}</span>`).join('') || '—'}</td><td><b>${m.f.length}/6</b></td></tr>`;
+}).join('');
+
+let picked = new Set(store.get('picked', []));
+let filter = 'all';
+const ideasEl = document.getElementById('ideas');
+function bar(v){ return `<span class="bar"><i style="width:${v*20}%"></i></span>`; }
+function renderIdeas(){
+  ideasEl.innerHTML = ideas.filter(i =>
+    filter === 'all' || (filter === 'mongo' && mongo[i.n].f.length === 6) || (filter === 'top' && i.top) || (filter === 'picked' && picked.has(i.n)) || i.tracks.includes(filter)
+  ).map(i => `
+    <article class="card idea ${i.top ? 'top' : ''}">
+      <button class="btn pick" type="button" data-n="${i.n}" aria-pressed="${picked.has(i.n)}">${picked.has(i.n) ? '★ Picked' : '☆ Pick'}</button>
+      <h3><span class="num">#${i.n}</span> ${i.name}</h3>
+      <div>${i.tracks.map(t => `<span class="chip t-${t}">${t === 'real' ? 'Real World' : 'Agents That Ship'}</span>`).join('')}${i.bounties.map(b => `<span class="chip b">${b}</span>`).join('')}${i.top ? '<span class="chip">top pick</span>' : ''}</div>
+      <p>${i.pitch}</p>
+      <div class="row"><b>MongoDB (${mongo[i.n].f.length}/6):</b> ${mongo[i.n].f.map(k => `<span class="chip t-agents">${k}</span>`).join('')}${mongo[i.n].bonus.map(b => `<span class="chip">${b}</span>`).join('')}<br>${mongo[i.n].how}</div>
+      <div class="row"><b>Judges:</b> ${i.judges}</div>
+      <div class="row"><b>Hermes:</b> ${i.hermes}</div>
+      <div class="row"><b>Demo moment:</b> ${i.demo}</div>
+      <div class="score"><span>Impact${bar(i.scores.impact)}</span><span>Wow${bar(i.scores.wow)}</span><span>Feasible${bar(i.scores.risk)}</span></div>
+    </article>`).join('') || '<p class="sub">Nothing here yet — pick ideas with ☆.</p>';
+}
+ideasEl.addEventListener('click', e => {
+  const b = e.target.closest('.pick'); if (!b) return;
+  const n = +b.dataset.n;
+  picked.has(n) ? picked.delete(n) : picked.add(n);
+  store.set('picked', [...picked]); renderIdeas();
+});
+document.getElementById('filters').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  filter = b.dataset.f;
+  document.querySelectorAll('#filters button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  renderIdeas();
+});
+renderIdeas();
+
+</script>
+</body>
+</html>
