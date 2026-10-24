@@ -1,6 +1,4 @@
 # secrets
-.env
-.env.*
 !.env.example
 # local / generated
 .venv/
@@ -8,3 +6,5 @@ __pycache__/
 logs/
 uploads/
 photos/
+config.bat
+node_modules
