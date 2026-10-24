@@ -23,7 +23,7 @@ body {
   font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 .bar {
-  background: var(--asphalt); color: var(--paper); padding: 14px 16px;
+  background: var(--asphalt); color: #F3F0E6; padding: 14px 16px;
   border-bottom: 6px solid var(--yellow);
 }
 .logo { font-weight: 800; letter-spacing: 2px; font-size: 20px; }
@@ -58,7 +58,7 @@ input[type=text] {
 .progress li.done { color: var(--ink); }
 .progress li.done::before { content: "✓"; border: 0; animation: none; color: var(--green); font-weight: 800; top: 5px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.reply { background: var(--asphalt); color: var(--paper); border-radius: 14px; padding: 16px 18px; }
+.reply { background: var(--asphalt); color: #F3F0E6; border-radius: 14px; padding: 16px 18px; }
 .reply p { margin: 6px 0; }
 .reply.error { background: var(--red); }
 .badge { display: inline-block; font-weight: 800; font-size: 12px; letter-spacing: 1px; padding: 3px 8px; border-radius: 6px; }
@@ -77,7 +77,7 @@ input[type=text] {
 .map-btn-tr { position: absolute; top: 10px; right: 10px; z-index: 500; }
 .map-pill {
   position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 500;
-  background: var(--asphalt); color: var(--paper); border: 2px solid var(--yellow);
+  background: var(--asphalt); color: #F3F0E6; border: 2px solid var(--yellow);
   border-radius: 999px; padding: 10px 18px; font-size: 15px; font-weight: 700; cursor: pointer;
   box-shadow: 0 3px 10px rgba(0,0,0,.3); white-space: nowrap;
 }
@@ -93,7 +93,7 @@ input[type=text] {
   padding: max(12px, env(safe-area-inset-top)) 12px 12px;
   background: linear-gradient(var(--asphalt), rgba(27,30,27,0));
 }
-.fs-title { color: var(--paper); font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.fs-title { color: #F3F0E6; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .map-wrap.fullscreen .map-pill { bottom: calc(96px + env(safe-area-inset-bottom)); }
 .map-wrap.fullscreen .fs-done {
   display: block; position: absolute; left: 16px; right: 16px; width: auto; z-index: 500;
@@ -109,7 +109,7 @@ body.no-scroll { overflow: hidden; }
 .pc-box[open] summary::after { transform: rotate(180deg); }
 .pc-row { display: flex; gap: 8px; }
 .pc-row input { margin-top: 0; text-transform: uppercase; }
-.pc-go { padding: 0 18px; border: 0; border-radius: 10px; background: var(--asphalt); color: var(--paper); font-weight: 700; font-size: 16px; cursor: pointer; }
+.pc-go { padding: 0 18px; border: 0; border-radius: 10px; background: var(--asphalt); color: #F3F0E6; font-weight: 700; font-size: 16px; cursor: pointer; }
 
 /* ---- Existing reports layer ---- */
 .map-chip {
@@ -124,3 +124,12 @@ body.no-scroll { overflow: hidden; }
 .pop-meta { color: #5E635B; font-size: 12px; margin: 4px 0 8px; }
 .pop-btn { display: block; width: 100%; border: 0; border-radius: 8px; padding: 9px; background: #F2C230; color: #1B1E1B; font-weight: 700; cursor: pointer; }
 .pop-link { display: block; text-align: center; margin-top: 6px; font-size: 13px; }
+.pop-src { color: #5E635B; font-size: 11px; }
+
+/* ---- Browse reports before taking a photo ---- */
+.browse-card { margin-top: 16px; }
+.browse-card h2 { margin-top: 0; }
+.browse-only { display: none; }
+#map-area.browsing .browse-only { display: block; }
+#map-area.browsing span.browse-only { display: inline; }
+#map-area.browsing .pin-only, #map-area.browsing .fs-done { display: none; }

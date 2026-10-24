@@ -18,7 +18,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import config
+from app import config, fixmystreet
 from app.db import get_db
 from app.log import log
 from app.pipeline import UPLOAD_DIR, process_report
@@ -97,6 +97,15 @@ def api_issues_area(response: Response, w: float, s: float, e: float, n: float):
             for i in db.issues.find({"status": {"$ne": "fixed"}, "location": {"$geoWithin": {"$geometry": box}}}, proj).limit(300)]
     _area_cache[key] = (time.time(), pins)
     return pins
+
+
+@app.get("/api/fms/area")
+def api_fms_area(response: Response, w: float, s: float, e: float, n: float):
+    """Open FixMyStreet reports for one map grid cell (cached server-side for 10 min)."""
+    if e - w > 0.05 or n - s > 0.05:
+        raise HTTPException(400, "Area too large")
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return fixmystreet.reports_in(w, s, e, n)
 
 
 @app.get("/api/issues")

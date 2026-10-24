@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#1B1E1B">
 <title>Street Fixer</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=2">
 </head>
 <body>
 <header class="bar">
@@ -30,11 +30,25 @@
     <p class="hint">Measuring a pothole? Put a coin, your shoe or your finger next to it, only when it's safe.</p>
   </section>
 
+  <!-- Before the photo: browse what's already reported (shares the map with step 2) -->
+  <section id="browse" class="card browse-card">
+    <h2>Already reported nearby?</h2>
+    <div id="browse-ask">
+      <p class="muted">See problems people have already reported, so you can add to one instead of starting a new report.
+        Can we use your location to show your street? It's only used to centre the map.</p>
+      <button id="browse-yes" class="big-btn">📍 Yes, use my location</button>
+      <button id="browse-no" class="link-btn">No thanks, I'll find it on the map</button>
+    </div>
+    <p id="browse-status" class="muted" hidden></p>
+    <div id="browse-slot"></div>
+  </section>
+
   <!-- Step 2: location + send -->
   <section id="step-locate" class="card" hidden>
     <img id="preview" class="preview" alt="Your photo">
     <h2>Where is it?</h2>
     <p id="loc-status" class="muted">Finding your location…</p>
+    <div id="locate-slot"><div id="map-area">
     <div id="map-wrap" class="map-wrap">
       <div id="map"></div>
       <button id="fs-open" class="map-btn map-btn-tr" aria-label="Full screen map" title="Full screen">⛶</button>
@@ -42,11 +56,13 @@
       <button id="reports-btn" class="map-chip on" aria-pressed="true" title="Show problems already reported">👁 Reported <span id="reports-count"></span></button>
       <div class="fs-bar">
         <button id="fs-close" class="map-btn" aria-label="Close full screen">✕</button>
-        <span class="fs-title">Drag the pin onto the problem</span>
+        <span class="fs-title pin-only">Drag the pin onto the problem</span>
+        <span class="fs-title browse-only">Problems already reported</span>
       </div>
       <button id="fs-done" class="big-btn fs-done">✓ Use this spot</button>
     </div>
-    <p class="hint">Drag the pin or tap the map if it's not quite right.</p>
+    <p class="hint pin-only">Drag the pin or tap the map if it's not quite right.</p>
+    <p class="hint browse-only">Tap a dot to see the report. Spotted yours? Tap "This is my problem" to add your photo to it.</p>
     <details id="pc-box" class="pc-box">
       <summary>Not there right now? Enter a postcode</summary>
       <div class="pc-row">
@@ -56,6 +72,7 @@
       <datalist id="pc-list"></datalist>
       <p id="pc-msg" class="hint"></p>
     </details>
+    </div></div>
     <input id="note" type="text" placeholder="Anything to add? (optional)" maxlength="200">
     <button id="send" class="big-btn" disabled>Send report</button>
     <button id="retake" class="link-btn">Retake photo</button>
@@ -75,27 +92,66 @@
 const $ = (id) => document.getElementById(id);
 const HUB = [51.5285, -0.0835];  // Encode Hub, Pitfield St: fallback centre
 let photoFile = null, map = null, pin = null;
+// Browse mode: map shown before a photo is taken, no pin. geoChoice: null = not asked, true/false = answer.
+let browsing = false, geoChoice = null, target = null;
 
 function show(step) {
   for (const s of ["step-photo", "step-locate", "step-result"]) $(s).hidden = s !== step;
+  $("browse").hidden = step !== "step-photo";
   window.scrollTo(0, 0);
 }
 
-function initMap(latlng) {
+// Status line for whichever step currently holds the map.
+function status(msg) {
+  const el = browsing ? $("browse-status") : $("loc-status");
+  el.hidden = false;
+  el.textContent = msg;
+}
+
+// One map, moved between the browse card and step 2; the pin only exists outside browse mode.
+function placeMap(browse) {
+  browsing = browse;
+  $(browse ? "browse-slot" : "locate-slot").appendChild($("map-area"));
+  $("map-area").classList.toggle("browsing", browse);
+  if (pin) browse ? pin.remove() : pin.addTo(map);
+  if (map) setTimeout(() => map.invalidateSize(), 50);
+}
+
+function ensureMap(latlng, zoom) {
   if (!map) {
-    map = L.map("map", { zoomControl: false }).setView(latlng, 18);
+    map = L.map("map", { zoomControl: false }).setView(latlng, zoom);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
-    pin = L.marker(latlng, { draggable: true }).addTo(map);
-    map.on("click", (e) => pin.setLatLng(e.latlng));
+      maxZoom: 19, attribution: "© OpenStreetMap contributors · Reports: <a href=\"https://www.fixmystreet.com\">FixMyStreet</a>" }).addTo(map);
+    map.on("click", (e) => { if (pin && !browsing) pin.setLatLng(e.latlng); });
   } else {
-    map.setView(latlng, 18);
-    pin.setLatLng(latlng);
+    map.setView(latlng, zoom);
   }
   setTimeout(() => map.invalidateSize(), 50);
-  $("send").disabled = false;
   Nearby.attach();
 }
+
+function initMap(latlng) {
+  ensureMap(latlng, 18);
+  if (pin) pin.setLatLng(latlng);
+  else pin = L.marker(latlng, { draggable: true }).addTo(map);
+  $("send").disabled = false;
+}
+
+function startBrowse(useLocation) {
+  geoChoice = useLocation;
+  $("browse-ask").hidden = true;
+  placeMap(true);
+  if (useLocation) return locate(true);
+  ensureMap(HUB, 16);
+  status("Pan the map or enter a postcode to see your area.");
+  $("pc-box").open = true;
+}
+$("browse-yes").onclick = () => startBrowse(true);
+$("browse-no").onclick = () => startBrowse(false);
+// Already allowed on an earlier visit: no prompt will appear, so open the map straight away.
+navigator.permissions?.query({ name: "geolocation" })
+  .then((p) => { if (p.state === "granted" && geoChoice === null && !photoFile) startBrowse(true); })
+  .catch(() => {});
 
 // ---- Existing reports on the map ----
 // Lazy: nothing loads until the map is shown and the layer is on, and only at street zoom.
@@ -132,9 +188,11 @@ const Nearby = (() => {
     const key = `${x}:${y}`, c = cells.get(key);
     if (c && Date.now() - c.t < TTL) return c.pending || c.pins;
     const w = x * CELL, s = y * CELL;
-    const pending = fetch(`/api/issues/area?w=${w.toFixed(4)}&s=${s.toFixed(4)}&e=${(w + CELL).toFixed(4)}&n=${(s + CELL).toFixed(4)}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .catch(() => [])
+    const qs = `w=${w.toFixed(4)}&s=${s.toFixed(4)}&e=${(w + CELL).toFixed(4)}&n=${(s + CELL).toFixed(4)}`;
+    const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    // Our own Street Fixer issues + public FixMyStreet reports for the same cell, in parallel.
+    const pending = Promise.all([get(`/api/issues/area?${qs}`), get(`/api/fms/area?${qs}`)])
+      .then(([ours, fms]) => ours.concat(fms))
       .then((pins) => { cells.set(key, { t: Date.now(), pins }); return pins; });
     cells.set(key, { t: Date.now(), pending });
     return pending;
@@ -155,18 +213,28 @@ const Nearby = (() => {
   }
 
   function addPin(p) {
+    const fms = p.src === "fms";
     const m = L.circleMarker(p.ll, {
       renderer, radius: p.n > 1 ? 9 : 7, weight: p.sev === "urgent" ? 3 : 2,
-      color: p.sev === "urgent" ? "#B3261E" : "#1B1E1B", fillColor: COLORS[p.cat] || COLORS.other, fillOpacity: 0.9,
+      color: p.sev === "urgent" ? "#B3261E" : fms ? "#FFFFFF" : "#1B1E1B",
+      fillColor: COLORS[p.cat] || COLORS.other, fillOpacity: fms ? 0.75 : 0.95,
     }).addTo(layer);
     m.bindPopup(() => popupHtml(p), { maxWidth: 240 });
-    m.on("popupopen", () => loadDetail(p, m));
+    if (!fms) m.on("popupopen", () => loadDetail(p, m));  // FixMyStreet pins already carry everything
     return m;
   }
 
   function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
 
   function popupHtml(p, d) {
+    if (p.src === "fms") {
+      const img = p.photo ? `<img src="${esc(p.photo)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="pop-img" alt="">` : "";
+      return `<div class="pop">${img}
+        <b>${esc(LABELS[p.cat] || "Problem")}</b> <span class="pop-src">FixMyStreet${p.date ? " · " + esc(p.date) : ""}</span>
+        <div>${esc(p.s)}</div>
+        <button class="pop-btn" data-ref="${esc(p.ref)}">This is my problem: pin it here</button>
+        <a class="pop-link" href="${esc(p.url)}" target="_blank" rel="noopener">View on FixMyStreet</a></div>`;
+    }
     const photo = d && d.photos && d.photos[0]
       ? `<img src="/uploads/${encodeURIComponent(d.photos[0])}" loading="lazy" decoding="async" class="pop-img" alt="">` : "";
     return `<div class="pop">${photo}
@@ -191,24 +259,36 @@ const Nearby = (() => {
     if (!btn) return;
     const m = markers.get(btn.dataset.ref);
     if (!m) return;
-    pin.setLatLng(m.getLatLng());
     map.closePopup();
-    $("loc-status").textContent = "📌 Pinned to the existing report: your photo will be added to it.";
+    if (browsing) {  // no photo yet: remember the spot and open the camera
+      target = m.getLatLng();
+      if (history.state?.fs) history.back();
+      $("photo").click();
+      return;
+    }
+    pin.setLatLng(m.getLatLng());
+    status("📌 Pinned to the existing report: your photo will be added to it.");
   });
 
   return { attach };
 })();
 
 function locate(fresh = false) {
-  $("loc-status").textContent = "Finding your location…";
+  status("Finding your location…");
   $("locate-btn").classList.add("busy");
   const done = () => $("locate-btn").classList.remove("busy");
   if (!navigator.geolocation) { done(); return fallback("Location isn't available: tap the map or enter a postcode."); }
   navigator.geolocation.getCurrentPosition(
     (p) => {
       done();
-      $("loc-status").textContent = `📍 Your location, accurate to about ${Math.round(p.coords.accuracy)} m.`;
-      initMap([p.coords.latitude, p.coords.longitude]);
+      geoChoice = true;
+      const ll = [p.coords.latitude, p.coords.longitude];
+      if (browsing) {
+        status("📍 Showing reports around you.");
+        return ensureMap(ll, 16);  // wide enough to see the neighbourhood, close enough to load pins
+      }
+      status(`📍 Your location, accurate to about ${Math.round(p.coords.accuracy)} m.`);
+      initMap(ll);
       map.setZoom(19);  // get close so the pin can be placed on the exact spot
     },
     () => { done(); fallback("Couldn't get your location: tap the map or enter a postcode."); },
@@ -220,7 +300,7 @@ function setFullscreen(on) {
   $("map-wrap").classList.toggle("fullscreen", on);
   document.body.classList.toggle("no-scroll", on);
   if (on) history.pushState({ fs: true }, "");  // phone Back button closes it
-  setTimeout(() => { map.invalidateSize(); map.panTo(pin.getLatLng()); }, 60);
+  setTimeout(() => { map.invalidateSize(); if (pin && !browsing) map.panTo(pin.getLatLng()); }, 60);
 }
 $("fs-open").onclick = () => setFullscreen(true);
 $("fs-close").onclick = $("fs-done").onclick = () => history.state?.fs ? history.back() : setFullscreen(false);
@@ -254,10 +334,14 @@ async function goPostcode() {
     const d = await r.json();
     if (!r.ok || !d.result) throw new Error();
     const { latitude, longitude, postcode, admin_district } = d.result;
-    initMap([latitude, longitude]);
-    map.setZoom(18);
     $("pc-msg").textContent = "";
-    $("loc-status").textContent = `📮 ${postcode}, ${admin_district}. Now drag the pin onto the exact spot.`;
+    if (browsing) {
+      ensureMap([latitude, longitude], 16);
+      status(`📮 Reports around ${postcode}, ${admin_district}.`);
+    } else {
+      initMap([latitude, longitude]);
+      status(`📮 ${postcode}, ${admin_district}. Now drag the pin onto the exact spot.`);
+    }
     $("pc-box").open = false;
   } catch {
     $("pc-msg").textContent = "Couldn't find that postcode. Check it and try again.";
@@ -267,19 +351,39 @@ $("pc-go").onclick = goPostcode;
 $("pc").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); goPostcode(); } });
 
 function fallback(msg) {
-  $("loc-status").textContent = msg;
-  initMap(HUB);
+  status(msg);
+  if (browsing) ensureMap(HUB, 16);
+  else initMap(HUB);
 }
 
 $("photo").addEventListener("change", (e) => {
   photoFile = e.target.files[0];
-  if (!photoFile) return;
+  if (!photoFile) { target = null; return; }
   $("preview").src = URL.createObjectURL(photoFile);
+  const centre = map && map.getCenter();
+  placeMap(false);
   show("step-locate");
-  locate();
+  if (target) {  // chose an existing report on the browse map
+    initMap(target);
+    status("📌 Pinned to the existing report: your photo will be added to it.");
+    target = null;
+  } else if (geoChoice === false) {  // said no to location: don't prompt, start where they were looking
+    initMap(centre || HUB);
+    status("Drag the pin onto the problem, tap 📍 Use my location, or enter a postcode.");
+  } else {
+    locate();
+  }
 });
 
-$("retake").onclick = () => { $("photo").value = ""; show("step-photo"); };
+// The main photo button starts a fresh report, not one pinned to a dot picked earlier.
+document.querySelector('label[for="photo"]').addEventListener("click", () => { target = null; });
+
+$("retake").onclick = () => {
+  $("photo").value = "";
+  photoFile = null;
+  if (map) { placeMap(true); $("browse-ask").hidden = true; }
+  show("step-photo");
+};
 $("again").onclick = () => location.reload();
 
 // Progress lines shown while the agent works; the real answer replaces them.

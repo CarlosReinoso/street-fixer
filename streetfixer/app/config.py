@@ -37,6 +37,8 @@ TEST_MODE = FILING_MODE != "live"
 DEDUPE_RADIUS_M = 30          # reports closer than this may be the same problem
 MAX_PHOTO_BYTES = 8 * 1024 * 1024
 AREA_CACHE_SECONDS = 15      # server + browser cache for map pins in an area
+FMS_CACHE_SECONDS = 600      # FixMyStreet feed cache per area: be a polite neighbour
+HTTP_USER_AGENT = "StreetFixer/0.1 (Encode London hackathon; github.com/CarlosReinoso/street-fixer)"
 
 DATA_DIR = ROOT / "data"
 STATIC_DIR = ROOT / "app" / "static"
