@@ -6,6 +6,7 @@ Collections:
 - issues       one doc per real-world problem; many reports roll up into it
 - reports      every photo submission, linked to its issue
 - agent_memory Hermes agent state / short-term / long-term memory
+- fms_reports  backup of public FixMyStreet reports seen on the map (served when FixMyStreet is down)
 
 If MONGODB_URI is not set, `get_db()` returns None and the pipeline runs in
 offline mode (classification + local routing only) so the UI can still be built.
@@ -38,4 +39,6 @@ def ensure_indexes(db: Database) -> None:
     db.issues.create_index([("ref", ASCENDING)], unique=True)
     db.reports.create_index([("issue_id", ASCENDING)])
     db.agent_memory.create_index([("kind", ASCENDING), ("issue_id", ASCENDING)])
+    db.fms_reports.create_index([("ref", ASCENDING)], unique=True)
+    db.fms_reports.create_index([("location", GEOSPHERE)])
     log.info("indexes ensured")

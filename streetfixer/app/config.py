@@ -24,8 +24,8 @@ VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY", "")
 # Models
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-flash-latest")
-GEMINI_BACKUP_MODEL = os.getenv("GEMINI_BACKUP_MODEL", "gemini-flash-latest")  # free tier: newest models are slow or unavailable
-GEMINI_TIMEOUT_SECONDS = 60  # one call; free-tier calls can take ~25 s
+GEMINI_BACKUP_MODEL = os.getenv("GEMINI_BACKUP_MODEL", "gemini-flash-lite-latest")  # free tier: ~2 s; full Flash models were overloaded (503)
+GEMINI_TIMEOUT_SECONDS = 30  # one call; stops a report hanging on an overloaded model
 GEMINI_RETRIES = 3
 GEMINI_KEY_REST_SECONDS = 300  # after a quota/spend-cap error, skip that key for this long
 
