@@ -159,13 +159,13 @@ navigator.permissions?.query({ name: "geolocation" })
 // so panning back and forth costs nothing. Pins are canvas-drawn and keyed by ref.
 // Details and photos load only when a pin is tapped.
 const Nearby = (() => {
-  const CELL = 0.01, TTL = 60000, MIN_ZOOM = 15, MAX_CELLS = 16;
+  const CELL = 0.01, TTL = 60000, RETRY = 15000, MIN_ZOOM = 15, MAX_CELLS = 16;
   const COLORS = { pothole: "#F2C230", fly_tipping: "#C2410C", streetlight: "#3B82F6", other: "#8B8F84" };
   const LABELS = { pothole: "Pothole", fly_tipping: "Fly-tipping", streetlight: "Streetlight", other: "Street problem" };
   const cells = new Map();   // "x:y" -> { t, pins } or { t, pending: Promise }
   const markers = new Map(); // ref -> marker
   const details = new Map(); // ref -> issue detail (cached after first open)
-  let layer, renderer, on = true, attached = false, timer;
+  let layer, renderer, on = true, attached = false, timer, retryTimer = null;
 
   function attach() {
     if (attached) return;
@@ -189,11 +189,16 @@ const Nearby = (() => {
     if (c && Date.now() - c.t < TTL) return c.pending || c.pins;
     const w = x * CELL, s = y * CELL;
     const qs = `w=${w.toFixed(4)}&s=${s.toFixed(4)}&e=${(w + CELL).toFixed(4)}&n=${(s + CELL).toFixed(4)}`;
-    const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     // Our own Street Fixer issues + public FixMyStreet reports for the same cell, in parallel.
+    // A failed source (FixMyStreet is often slow) keeps the cell for RETRY ms only, so pins appear once it answers.
     const pending = Promise.all([get(`/api/issues/area?${qs}`), get(`/api/fms/area?${qs}`)])
-      .then(([ours, fms]) => ours.concat(fms))
-      .then((pins) => { cells.set(key, { t: Date.now(), pins }); return pins; });
+      .then(([ours, fms]) => {
+        const pins = (ours || []).concat(fms || []);
+        if (!(ours && fms)) retryTimer ||= setTimeout(() => { retryTimer = null; refresh(); }, RETRY + 100);
+        cells.set(key, { t: ours && fms ? Date.now() : Date.now() - TTL + RETRY, pins });
+        return pins;
+      });
     cells.set(key, { t: Date.now(), pending });
     return pending;
   }

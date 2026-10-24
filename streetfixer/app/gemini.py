@@ -3,8 +3,16 @@
 `classify_photo` sends the photo to Gemini with a strict JSON schema and
 returns a `Classification`. It retries on transient errors (503/500, "model
 overloaded") and falls back to a second model, then logs every call.
+
+Two safety nets so a demo never stalls on the AI:
+- Cache: results are stored per photo (hash of image + note + prompt) in CACHE_DIR,
+  so the same photo is classified once and every repeat is instant and free.
+- Backup key: on a quota or spend-cap error (429) the main key is rested for
+  GEMINI_KEY_REST_SECONDS and the photo goes to GEMINI_BACKUP_API_KEY instead
+  (GEMINI_BACKUP_MODEL only: the free tier is slow or missing on the newest model).
 """
 
+import hashlib
 import time
 from typing import Literal
 
@@ -15,7 +23,11 @@ from pydantic import BaseModel, Field
 from app import config
 from app.log import log, log_genai
 
-_client = genai.Client(api_key=config.GEMINI_API_KEY) if config.GEMINI_API_KEY else None
+# (label, client) in the order they are tried; label goes into the GenAI log.
+_http = types.HttpOptions(timeout=config.GEMINI_TIMEOUT_SECONDS * 1000)
+_clients = [(label, genai.Client(api_key=key, http_options=_http)) for label, key in
+            (("main", config.GEMINI_API_KEY), ("backup", config.GEMINI_BACKUP_API_KEY)) if key]
+_rest_until: dict[str, float] = {}  # label -> time the key may be used again
 
 
 class Pothole(BaseModel):
@@ -75,27 +87,53 @@ def _config() -> types.GenerateContentConfig:
     )
 
 
+def _is_quota_error(e: Exception) -> bool:
+    text = str(e)
+    return "429" in text or "RESOURCE_EXHAUSTED" in text
+
+
+def _cache_path(image: bytes, note: str | None):
+    h = hashlib.sha256(image + (note or "").encode() + PROMPT.encode()).hexdigest()
+    return config.CACHE_DIR / f"{h}.json"
+
+
 def classify_photo(image: bytes, mime_type: str = "image/jpeg", note: str | None = None) -> Classification:
     """Classify one street photo. `note` is optional text the reporter added."""
-    if _client is None:
+    if not _clients:
         raise RuntimeError("GEMINI_API_KEY is not set")
+    cache = _cache_path(image, note)
+    if cache.exists():
+        log.info("genai cache hit %s", cache.stem[:12])
+        return Classification.model_validate_json(cache.read_text())
+
     prompt = PROMPT + (f"\nReporter's note: {note}" if note else "")
     contents = [types.Part.from_bytes(data=image, mime_type=mime_type), prompt]
     cfg = _config()
     cfg_log = {"schema": "Classification", "temperature": 0.2, "thinking_level": "low", "media_resolution": "medium"}
 
     last_error = None
-    for attempt in range(config.GEMINI_RETRIES):
-        model = config.GEMINI_MODEL if attempt < config.GEMINI_RETRIES - 1 else config.GEMINI_FALLBACK_MODEL
-        started = time.time()
-        try:
-            resp = _client.models.generate_content(model=model, contents=contents, config=cfg)
-            result = resp.parsed if isinstance(resp.parsed, Classification) else Classification.model_validate_json(resp.text)
-            log_genai(model, prompt, cfg_log, result.model_dump(), started)
-            return result
-        except Exception as e:  # transient 5xx / overload: back off and retry
-            last_error = e
-            log_genai(model, prompt, cfg_log, None, started, error=str(e)[:300])
-            time.sleep(0.8 * (attempt + 1))
+    usable = [(l, c) for l, c in _clients if _rest_until.get(l, 0) <= time.time()] or _clients
+    for label, client in usable:
+        for attempt in range(config.GEMINI_RETRIES):
+            if label == "backup":
+                model = config.GEMINI_BACKUP_MODEL
+            else:
+                model = config.GEMINI_MODEL if attempt < config.GEMINI_RETRIES - 1 else config.GEMINI_FALLBACK_MODEL
+            started = time.time()
+            try:
+                resp = client.models.generate_content(model=model, contents=contents, config=cfg)
+                result = resp.parsed if isinstance(resp.parsed, Classification) else Classification.model_validate_json(resp.text)
+                log_genai(f"{model} [{label}]", prompt, cfg_log, result.model_dump(), started)
+                config.CACHE_DIR.mkdir(exist_ok=True)
+                cache.write_text(result.model_dump_json())
+                return result
+            except Exception as e:
+                last_error = e
+                log_genai(f"{model} [{label}]", prompt, cfg_log, None, started, error=str(e)[:300])
+                if _is_quota_error(e):  # retrying the same key will not help: rest it, try the next key
+                    _rest_until[label] = time.time() + config.GEMINI_KEY_REST_SECONDS
+                    log.warning("gemini %s key out of quota, resting %ss", label, config.GEMINI_KEY_REST_SECONDS)
+                    break
+                time.sleep(0.8 * (attempt + 1))  # transient 5xx / overload: back off and retry
     log.error("classify_photo failed after retries: %s", last_error)
     raise RuntimeError(f"Gemini failed: {last_error}")

@@ -12,6 +12,7 @@ Pins use the same light format as our own issues and link back to the original r
 """
 
 import re
+import threading
 import time
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
@@ -26,7 +27,16 @@ AROUND = "https://www.fixmystreet.com/around?ajax=1&bbox={w:.4f},{s:.4f},{e:.4f}
 REPORT = "https://www.fixmystreet.com/report/{id}"
 NS = {"georss": "http://www.georss.org/georss"}
 _cache: dict[tuple, tuple[float, list]] = {}
-_client = httpx.Client(timeout=8, headers={"User-Agent": config.HTTP_USER_AGENT})
+# FixMyStreet can take 20-40 s when busy: wait for it, but only a couple of requests at a time.
+_client = httpx.Client(timeout=config.FMS_TIMEOUT_SECONDS, headers={"User-Agent": config.HTTP_USER_AGENT})
+_slots = threading.Semaphore(2)
+
+
+def _get(url: str, timeout: float | None = None) -> httpx.Response:
+    with _slots:
+        resp = _client.get(url, timeout=timeout or config.FMS_TIMEOUT_SECONDS)
+    resp.raise_for_status()
+    return resp
 
 
 def _category(text: str) -> str:
@@ -45,19 +55,19 @@ def _photo(description: str) -> str | None:
     return m.group(1) if m else None
 
 
-def reports_in(w: float, s: float, e: float, n: float) -> list[dict]:
-    """Open FixMyStreet reports inside a bounding box, as map pins (cached)."""
+def reports_in(w: float, s: float, e: float, n: float) -> list[dict] | None:
+    """Open FixMyStreet reports inside a bounding box, as map pins (cached).
+
+    None means FixMyStreet failed and nothing is cached, so the caller can retry later."""
     key = ("box", round(w, 3), round(s, 3), round(e, 3), round(n, 3))
     hit = _cache.get(key)
     if hit and time.time() - hit[0] < config.FMS_CACHE_SECONDS:
         return hit[1]
     try:
-        resp = _client.get(AROUND.format(w=w, s=s, e=e, n=n))
-        resp.raise_for_status()
-        raw = resp.json()["pins"]
+        raw = _get(AROUND.format(w=w, s=s, e=e, n=n)).json()["pins"]
     except Exception as e:
         log.warning("fixmystreet around failed: %s", e)
-        return hit[1] if hit else []
+        return hit[1] if hit else None
 
     detail = {p["ref"]: p for p in reports_near((s + n) / 2, (w + e) / 2, km=1)}
     pins = []
@@ -80,11 +90,9 @@ def reports_near(lat: float, lon: float, km: int = 1) -> list[dict]:
     if hit and time.time() - hit[0] < config.FMS_CACHE_SECONDS:
         return hit[1]
     try:
-        resp = _client.get(FEED.format(lat=lat, lon=lon, km=km))
-        resp.raise_for_status()
-        root = ET.fromstring(resp.content)
+        root = ET.fromstring(_get(FEED.format(lat=lat, lon=lon, km=km), timeout=8).content)
     except Exception as e:
-        log.warning("fixmystreet feed failed: %s", e)
+        log.warning("fixmystreet feed failed: %s", e)  # only dates/photos are lost: pins still show
         return hit[1] if hit else []
 
     pins = []

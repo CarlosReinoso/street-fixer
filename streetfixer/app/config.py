@@ -16,6 +16,7 @@ load_dotenv(ROOT.parent / ".env")  # does not override values already set
 
 # Secrets
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_BACKUP_API_KEY = os.getenv("GEMINI_BACKUP_API_KEY", "")  # personal free-tier key, used when the main one is capped
 MONGODB_URI = os.getenv("MONGODB_URI", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY", "")
@@ -23,7 +24,10 @@ VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY", "")
 # Models
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-flash-latest")
+GEMINI_BACKUP_MODEL = os.getenv("GEMINI_BACKUP_MODEL", "gemini-flash-latest")  # free tier: newest models are slow or unavailable
+GEMINI_TIMEOUT_SECONDS = 60  # one call; free-tier calls can take ~25 s
 GEMINI_RETRIES = 3
+GEMINI_KEY_REST_SECONDS = 300  # after a quota/spend-cap error, skip that key for this long
 
 # Database
 DB_NAME = os.getenv("DB_NAME", "streetfixer")
@@ -38,8 +42,10 @@ DEDUPE_RADIUS_M = 30          # reports closer than this may be the same problem
 MAX_PHOTO_BYTES = 8 * 1024 * 1024
 AREA_CACHE_SECONDS = 15      # server + browser cache for map pins in an area
 FMS_CACHE_SECONDS = 600      # FixMyStreet feed cache per area: be a polite neighbour
+FMS_TIMEOUT_SECONDS = 45     # their map feed can take 20-40 s when busy
 HTTP_USER_AGENT = "StreetFixer/0.1 (Encode London hackathon; github.com/CarlosReinoso/street-fixer)"
 
 DATA_DIR = ROOT / "data"
 STATIC_DIR = ROOT / "app" / "static"
 LOG_DIR = ROOT / "logs"
+CACHE_DIR = ROOT / "cache"    # one JSON file per classified photo, so the same photo never costs a second call

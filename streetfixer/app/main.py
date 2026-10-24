@@ -101,11 +101,16 @@ def api_issues_area(response: Response, w: float, s: float, e: float, n: float):
 
 @app.get("/api/fms/area")
 def api_fms_area(response: Response, w: float, s: float, e: float, n: float):
-    """Open FixMyStreet reports for one map grid cell (cached server-side for 10 min)."""
+    """Open FixMyStreet reports for one map grid cell (cached server-side for 10 min).
+
+    If FixMyStreet is down or too slow, answer 503 so neither the browser nor the page caches an empty cell."""
     if e - w > 0.05 or n - s > 0.05:
         raise HTTPException(400, "Area too large")
+    pins = fixmystreet.reports_in(w, s, e, n)
+    if pins is None:
+        raise HTTPException(503, "FixMyStreet is not responding", headers={"Cache-Control": "no-store"})
     response.headers["Cache-Control"] = "public, max-age=300"
-    return fixmystreet.reports_in(w, s, e, n)
+    return pins
 
 
 @app.get("/api/issues")
