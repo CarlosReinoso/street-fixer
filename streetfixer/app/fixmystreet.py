@@ -9,6 +9,10 @@ FMS_CACHE_SECONDS so we never hammer their service:
     GeoRSS with dates and photos, but it leaves out reports sent to TfL and
     includes fixed ones, so it only adds detail to pins from the first source.
 Pins use the same light format as our own issues and link back to the original report.
+
+Backup: every successful fetch is upserted into the `fms_reports` collection (one doc per
+report, GeoJSON point). When FixMyStreet is down or too slow, pins come from there instead.
+Reports no longer in FixMyStreet's open list for a box are marked open=False, not deleted.
 """
 
 import re
@@ -18,8 +22,10 @@ import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 
 import httpx
+from pymongo import ASCENDING, GEOSPHERE, UpdateOne
 
 from app import config
+from app.db import get_db
 from app.log import log
 
 FEED = "https://www.fixmystreet.com/rss/l/{lat:.4f},{lon:.4f}/{km}"
@@ -65,9 +71,9 @@ def reports_in(w: float, s: float, e: float, n: float) -> list[dict] | None:
         return hit[1]
     try:
         raw = _get(AROUND.format(w=w, s=s, e=e, n=n)).json()["pins"]
-    except Exception as e:
-        log.warning("fixmystreet around failed: %s", e)
-        return hit[1] if hit else None
+    except Exception as err:  # not `e`: that is the box's east edge
+        log.warning("fixmystreet around failed: %s", err)
+        return hit[1] if hit else _from_backup(w, s, e, n)
 
     detail = {p["ref"]: p for p in reports_near((s + n) / 2, (w + e) / 2, km=1)}
     pins = []
@@ -78,6 +84,59 @@ def reports_in(w: float, s: float, e: float, n: float) -> list[dict] | None:
             "s": title[:120], "ll": [lat, lon], "date": "", "url": REPORT.format(id=rid), "photo": None,
         })
     _cache[key] = (time.time(), pins)
+    _save_backup(w, s, e, n, pins)
+    return pins
+
+
+def _box(w: float, s: float, e: float, n: float) -> dict:
+    return {"$geoWithin": {"$geometry": {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}}}
+
+
+_indexed = False
+
+
+def _save_backup(w: float, s: float, e: float, n: float, pins: list[dict]) -> None:
+    """Upsert this box's open reports into Atlas; mark ones that left the open list as closed."""
+    global _indexed
+    db = get_db()
+    if db is None:
+        return
+    try:
+        if not _indexed:
+            db.fms_reports.create_index([("ref", ASCENDING)], unique=True)
+            db.fms_reports.create_index([("location", GEOSPHERE)])
+            _indexed = True
+        now = time.time()
+        ops = []
+        for p in pins:
+            doc = {k: v for k, v in p.items() if k != "ll" and v not in (None, "")}  # keep older photo/date if this fetch lacks them
+            doc |= {"location": {"type": "Point", "coordinates": p["ll"][::-1]}, "open": True, "seen_at": now}
+            ops.append(UpdateOne({"ref": p["ref"]}, {"$set": doc}, upsert=True))
+        if ops:
+            db.fms_reports.bulk_write(ops, ordered=False)
+        db.fms_reports.update_many({"location": _box(w, s, e, n), "open": True, "ref": {"$nin": [p["ref"] for p in pins]}},
+                                   {"$set": {"open": False, "closed_seen_at": now}})
+    except Exception as ex:
+        log.warning("fixmystreet backup save failed: %s", ex)
+
+
+def _from_backup(w: float, s: float, e: float, n: float) -> list[dict] | None:
+    """Open reports for a box from the Atlas backup, or None if there is no backup to use."""
+    db = get_db()
+    if db is None:
+        return None
+    try:
+        docs = list(db.fms_reports.find({"location": _box(w, s, e, n), "open": True}, {"_id": 0}).limit(300))
+    except Exception as ex:
+        log.warning("fixmystreet backup read failed: %s", ex)
+        return None
+    pins = []
+    for d in docs:
+        d["ll"] = d.pop("location")["coordinates"][::-1]
+        for k in ("open", "seen_at", "closed_seen_at"):
+            d.pop(k, None)
+        pins.append({"sev": None, "n": 1, "date": "", "photo": None} | d)
+    log.info("fixmystreet down: %d pins from Atlas backup", len(pins))
     return pins
 
 
